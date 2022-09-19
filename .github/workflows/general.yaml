@@ -7,12 +7,12 @@ on:
   push:
     branches:
       - main
-      - dev
+      # - dev
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
       - main
-      - dev
+      # - dev
 
 env:
   CARGO_TERM_COLOR: always
@@ -86,7 +86,7 @@ jobs:
 
       - name: Check sqlx-data.json is up-to-date
         run: |
-          cargo sqlx prepare --check -- --bin zero2prod
+          cargo sqlx prepare --check -- --bin explorerust
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
