@@ -1,0 +1,33 @@
+[package]
+name = "explorerust"
+version = "0.1.0"
+authors = ["Amit Thapa <amithapa1994@gmail.com>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/main.rs"
+name = "explorerust"
+
+[dependencies]
+actix-web = "4.2.1"
+reqwest = "0.11.11"
+serde = { version = "1.0.144", features = ["derive"] }
+tokio = { version = "1.21.1", features = ["rt", "macros"] }
+config = "0.13.2"
+
+
+[dependencies.sqlx]
+version = "0.6.2"
+default-features = false
+features = [
+    "runtime-actix-rustls",
+    "macros",
+    "postgres",
+    "uuid",
+    "chrono",
+    "migrate"
+]
