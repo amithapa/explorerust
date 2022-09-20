@@ -1,4 +1,9 @@
-use explorerust::configuration::{get_configuration, DatabaseSettings};
+use explorerust::{
+    configuration::{get_configuration, DatabaseSettings},
+    telemetry::{get_subscriber, init_subscriber},
+};
+use once_cell::sync::Lazy;
+use secrecy::ExposeSecret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 use tokio;
@@ -31,8 +36,6 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     let app = spawn_app().await;
     let mut configuration = get_configuration().expect("Failed to read configuration");
     configuration.database.database_name = Uuid::new_v4().to_string();
-
-    let connection_string = configuration.database.connection_string();
 
     let client = reqwest::Client::new();
 
@@ -91,6 +94,17 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
     }
 }
 
+// Ensure that the `tracing` stack is only initialized once using `once_cell`
+static TRACING: Lazy<()> = Lazy::new(|| {
+    if std::env::var("TEST_LOG").is_ok() {
+        let subscriber = get_subscriber("test".into(), "debug".into(), std::io::stdout);
+        init_subscriber(subscriber);
+    } else {
+        let subscriber = get_subscriber("test".into(), "debug".into(), std::io::sink);
+        init_subscriber(subscriber);
+    };
+});
+
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
@@ -98,6 +112,10 @@ pub struct TestApp {
 
 // Launch our application in the background -somehow-
 async fn spawn_app() -> TestApp {
+    // The first time `initialize` is invoked the code in `TRACING` is executed.
+    // All other invocations will instead skip execution. Lazy::force(&TRACING);
+    Lazy::force(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind random port");
 
     // We retrieve the port assigned to us by the OS.
@@ -122,16 +140,17 @@ async fn spawn_app() -> TestApp {
 
 pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
     // create database
-    let mut connection = PgConnection::connect(&config.connection_string_without_db())
-        .await
-        .expect("Failed to connect to Postgres");
+    let mut connection =
+        PgConnection::connect(&config.connection_string_without_db().expose_secret())
+            .await
+            .expect("Failed to connect to Postgres");
     connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
         .await
         .expect("Failed to create database.");
 
     // Migrate database
-    let connection_pool = PgPool::connect(&config.connection_string())
+    let connection_pool = PgPool::connect(&config.connection_string().expose_secret())
         .await
         .expect("Failed tro connect to Postgres.");
 
